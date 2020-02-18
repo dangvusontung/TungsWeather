@@ -7,6 +7,8 @@ import android.location.Geocoder
 import android.location.LocationManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Message
 import android.util.Log
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -17,40 +19,56 @@ import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import com.android.volley.Request
 import com.android.volley.Response
+import kotlinx.android.synthetic.main.activity_main.*
 import java.util.*
 import kotlin.math.roundToInt
 
 private const val TAG = "MainActivity"
+
 private const val URL = "https://api.darksky.net/forecast/"
 private const val API = "8a82e5e36287b864d19a71f08b022e27"
 
+const val VALUE_LATITUDE = "latitude"
+const val VALUE_LONGITUDE = "longitude"
+const val VALUE_LOADED_DATA = "loaded_data"
+const val VALUE_CITY_NAME = "city_name"
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var cityName : TextView
-    private lateinit var bigTemperature : TextView
-    private lateinit var currentSummary : TextView
-    private lateinit var mainContainer : ConstraintLayout
+    private var latitude : Double = 0.0
+    private var longitude : Double = 0.0
+    private var cityName = ""
     private var requestURL = "$URL$API"
 
-    private lateinit var adapter : WeatherAdapter
+    private var loadedData = ""
+
+    private val mHandler = object : Handler(){
+        override fun handleMessage(msg: Message) {
+            val bundle = Bundle()
+            bundle.putDouble(VALUE_LATITUDE, latitude)
+            bundle.putDouble(VALUE_LONGITUDE, longitude)
+            bundle.putString(VALUE_LOADED_DATA, loadedData)
+            bundle.putString(VALUE_CITY_NAME, cityName)
+            Log.d(TAG, "data is $loadedData")
+            val currentFragment = CurrentFragment(applicationContext)
+            currentFragment.arguments = bundle
+
+            supportFragmentManager.beginTransaction().add(R.id.fragment_holder, currentFragment , null).commit()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        mainContainer = findViewById(R.id.main_container)
-        recyclerView = findViewById(R.id.recycler_view)
-        recyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        cityName = findViewById(R.id.city_name)
-        bigTemperature = findViewById(R.id.big_temperature)
-        currentSummary = findViewById(R.id.current_summary)
 
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED){
             requestPermission()
         }
         getLocation()
         getData()
+
+
+
     }
 
     private fun getLocation() {
@@ -59,18 +77,16 @@ class MainActivity : AppCompatActivity() {
 
         try {
             val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-            val latitude = location?.latitude
-            val longitude = location?.longitude
+            latitude = location!!.latitude
+            longitude = location.longitude
 
             val geocoder = Geocoder(this, Locale("vi", "VIETNAM"))
 
 
             val address = geocoder.getFromLocation(latitude!!, longitude!!,1)
             if (address != null) {
-                val cityName = address[0].adminArea
-                this.cityName.text = cityName
+                cityName = address[0].adminArea
             }
-
 
             Log.d(TAG, "latitude is $latitude")
             Log.d(TAG, "longitude is $longitude")
@@ -94,14 +110,10 @@ class MainActivity : AppCompatActivity() {
             loadContent()
         }).start()
 
-
     }
 
     private fun loadContent() {
-
         Log.d(TAG, "loadContent() starts")
-        var data = ""
-
         val queue = Volley.newRequestQueue(this)
         val url = requestURL
 
@@ -109,40 +121,19 @@ class MainActivity : AppCompatActivity() {
             StringRequest(Request.Method.GET, url, Response.Listener<String> {
                 Log.d(TAG, "success")
                 Log.d(TAG, "Result is $it")
-                parseData(it)
+                loadedData = it
+
+                val msg = Message();
+                msg.obj = loadedData
+                mHandler.sendMessage(msg)
 
             }, Response.ErrorListener {
                 Log.d(TAG, "failed")
             })
         queue.add(stringRequest)
 
-        Log.d(TAG, "getting data with $data")
+        Log.d(TAG, "getting data")
     }
 
 
-    private fun parseData(data : String) {
-        Log.d(TAG, "parseData() called with $data")
-        val parser = JsonDataParser()
-
-        adapter = WeatherAdapter(parser.weatherInfoList(data), this)
-        recyclerView.adapter = adapter
-
-        val currentInfo = adapter.getList()[0]
-        val displayedCurrentTemp = "${currentInfo.temperature.roundToInt()}\u2103"
-        bigTemperature.text = displayedCurrentTemp
-        currentSummary.text = currentInfo.summary
-
-        setBackGroundColor(currentInfo.icon)
-
-    }
-
-    private fun setBackGroundColor(icon : String){
-        when (icon) {
-            "mostly-cloudy" -> mainContainer.setBackgroundColor(resources.getColor(R.color.grey, null))
-            "overcast" -> mainContainer.setBackgroundColor(resources.getColor(R.color.dark_grey, null))
-            "partly-cloudy" -> mainContainer.setBackgroundColor(resources.getColor(R.color.light_blue, null))
-            "clear-day" -> mainContainer.setBackgroundColor(resources.getColor(R.color.light_sky_blue, null))
-        }
-
-    }
 }
