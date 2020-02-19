@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import java.text.DecimalFormat
 
 class WeatherAdapter(
-    private val listInfo : ArrayList<WeatherInfo>,
+    private var listInfo: List<WeatherInfo>,
     private val context: Context
 ) : RecyclerView.Adapter<WeatherViewHolder>() {
 
@@ -41,8 +41,12 @@ class WeatherAdapter(
         holder.date.text = weatherInfo.day
     }
 
-    fun getList() : ArrayList<WeatherInfo> {
+    fun getList(): List<WeatherInfo> {
         return listInfo
+    }
+
+    fun setList(infos: List<WeatherInfo>) {
+        this.listInfo = infos
     }
 }
 

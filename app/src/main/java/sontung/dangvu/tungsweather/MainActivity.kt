@@ -5,23 +5,12 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.LocationManager
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.Handler
-import android.os.Message
 import android.util.Log
-import android.widget.TextView
-import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.android.volley.toolbox.StringRequest
-import com.android.volley.toolbox.Volley
-import com.android.volley.Request
-import com.android.volley.Response
-import kotlinx.android.synthetic.main.activity_main.*
 import java.util.*
-import kotlin.math.roundToInt
 
 private const val TAG = "MainActivity"
 
@@ -42,21 +31,6 @@ class MainActivity : AppCompatActivity() {
 
     private var loadedData = ""
 
-    private val mHandler = object : Handler(){
-        override fun handleMessage(msg: Message) {
-            val bundle = Bundle()
-            bundle.putDouble(VALUE_LATITUDE, latitude)
-            bundle.putDouble(VALUE_LONGITUDE, longitude)
-            bundle.putString(VALUE_LOADED_DATA, loadedData)
-            bundle.putString(VALUE_CITY_NAME, cityName)
-            Log.d(TAG, "data is $loadedData")
-            val currentFragment = CurrentFragment(applicationContext)
-            currentFragment.arguments = bundle
-
-            supportFragmentManager.beginTransaction().add(R.id.fragment_holder, currentFragment , null).commit()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -64,11 +38,34 @@ class MainActivity : AppCompatActivity() {
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED){
             requestPermission()
         }
+
+        val model: WeatherViewModel by viewModels()
+        model.getWeatherInfos().observe(this, androidx.lifecycle.Observer {
+
+            updateUI()
+        })
+
+
         getLocation()
-        getData()
+        Log.d(TAG, "getting online data")
+        model.getOnlineData(requestURL)
+//        getData()
 
+    }
 
+    private fun updateUI() {
+        Log.d(TAG, "updateUI()")
+        val bundle = Bundle()
+        bundle.putDouble(VALUE_LATITUDE, latitude)
+        bundle.putDouble(VALUE_LONGITUDE, longitude)
+        bundle.putString(VALUE_LOADED_DATA, loadedData)
+        bundle.putString(VALUE_CITY_NAME, cityName)
+        Log.d(TAG, "data is $loadedData")
+        val currentFragment = CurrentFragment(applicationContext)
+        currentFragment.arguments = bundle
 
+        supportFragmentManager.beginTransaction().add(R.id.fragment_holder, currentFragment, null)
+            .commit()
     }
 
     private fun getLocation() {
@@ -83,7 +80,7 @@ class MainActivity : AppCompatActivity() {
             val geocoder = Geocoder(this, Locale("vi", "VIETNAM"))
 
 
-            val address = geocoder.getFromLocation(latitude!!, longitude!!,1)
+            val address = geocoder.getFromLocation(latitude, longitude, 1)
             if (address != null) {
                 cityName = address[0].adminArea
             }
@@ -94,9 +91,17 @@ class MainActivity : AppCompatActivity() {
             requestURL= "$requestURL/$latitude,$longitude"
             Log.d(TAG, requestURL)
 
-        } catch (e : SecurityException){
+        }
+//        catch (e : NullPointerException){
+//            Log.d(TAG, "$e")
+//
+//        }
+        catch (e: SecurityException) {
             Log.d(TAG, "$e")
         }
+//        catch (e : Exception) {
+//            Log.d(TAG, "$e")
+//        }
 
     }
 
@@ -104,36 +109,37 @@ class MainActivity : AppCompatActivity() {
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1)
     }
 
-    private fun getData() {
-        Log.d(TAG, "getData called()")
-        Thread(Runnable {
-            loadContent()
-        }).start()
+//    private fun getData() {
+//        Log.d(TAG, "getData called()")
+//        Thread(Runnable {
+//            loadContent()
+//        }).start()
+//        fail_text.visibility = View.VISIBLE
+//    }
 
-    }
 
-    private fun loadContent() {
-        Log.d(TAG, "loadContent() starts")
-        val queue = Volley.newRequestQueue(this)
-        val url = requestURL
-
-        val stringRequest =
-            StringRequest(Request.Method.GET, url, Response.Listener<String> {
-                Log.d(TAG, "success")
-                Log.d(TAG, "Result is $it")
-                loadedData = it
-
-                val msg = Message();
-                msg.obj = loadedData
-                mHandler.sendMessage(msg)
-
-            }, Response.ErrorListener {
-                Log.d(TAG, "failed")
-            })
-        queue.add(stringRequest)
-
-        Log.d(TAG, "getting data")
-    }
+//    private fun loadContent() {
+//        Log.d(TAG, "loadContent() starts")
+//        val queue = Volley.newRequestQueue(this)
+//        val url = requestURL
+//
+//        val stringRequest =
+//            StringRequest(Request.Method.GET, url, Response.Listener<String> {
+//                Log.d(TAG, "success")
+//                Log.d(TAG, "Result is $it")
+//                loadedData = it
+//
+//                val msg = Message();
+//                msg.obj = loadedData
+//                mHandler.sendMessage(msg)
+//
+//            }, Response.ErrorListener {
+//                Log.d(TAG, "failed")
+//            })
+//        queue.add(stringRequest)
+//
+//        Log.d(TAG, "getting data")
+//    }
 
 
 }
